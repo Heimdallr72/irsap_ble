@@ -36,9 +36,11 @@
     "step": {
       "init": {
         "title": "Opzioni IRSAP",
-        "description": "La temperatura Comfort viene riscritta nel radiatore quando imposti la modalità Riscalda (riprende il programma). L'intervallo è ogni quanto Home Assistant si collega per leggere lo stato.",
+        "description": "La temperatura Comfort viene riscritta nel radiatore quando imposti la modalità Auto (riparte il programma). Riscalda è la modalità a tempo: scalda alla temperatura indicata per il numero di ore indicato, poi riparte il programma (0 ore = senza scadenza). L'intervallo di lettura indica ogni quanto Home Assistant si collega per leggere lo stato.",
         "data": {
-          "comfort_temp": "Temperatura Comfort",
+          "comfort_temp": "Temperatura Comfort (Auto)",
+          "boost_temp": "Temperatura modalità a tempo (Riscalda)",
+          "boost_hours": "Durata modalità a tempo in ore (0 = senza scadenza)",
           "scan_interval": "Intervallo di lettura (secondi)"
         }
       }

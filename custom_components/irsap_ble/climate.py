@@ -17,9 +17,19 @@ from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceIn
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_COMFORT_TEMP, DEFAULT_COMFORT_TEMP, DOMAIN, MAX_TEMP, MIN_TEMP
+from .const import (
+    CONF_BOOST_HOURS,
+    CONF_BOOST_TEMP,
+    CONF_COMFORT_TEMP,
+    DEFAULT_BOOST_HOURS,
+    DEFAULT_BOOST_TEMP,
+    DEFAULT_COMFORT_TEMP,
+    DOMAIN,
+    MAX_TEMP,
+    MIN_TEMP,
+)
 from .coordinator import IrsapCoordinator
-from .protocol import CMD_MANUAL, CMD_OFF, CMD_PROGRAM, build_command
+from .protocol import CMD_MANUAL, CMD_OFF, CMD_PROGRAM, CMD_TEMPORARY, build_command
 from .radiator import IrsapError
 
 REFRESH_DELAY = 3  # seconds to let the radiator close the connection before reading it back
@@ -38,7 +48,8 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
+    # AUTO = the radiator program, HEAT = timed mode (setpoint and hours from the options)
+    _attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.HEAT]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
     )
@@ -68,7 +79,10 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     def hvac_mode(self) -> HVACMode | None:
         if self.coordinator.data is None:
             return None
-        return HVACMode.HEAT if self.coordinator.data.is_on else HVACMode.OFF
+        state = self.coordinator.data
+        if not state.is_on:
+            return HVACMode.OFF
+        return HVACMode.AUTO if state.mode == "program" else HVACMode.HEAT
 
     @property
     def current_temperature(self) -> float | None:
@@ -98,9 +112,11 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.OFF:
             await self._async_command(CMD_OFF)
-        elif hvac_mode == HVACMode.HEAT:
+        elif hvac_mode == HVACMode.AUTO:
             comfort = self._entry.options.get(CONF_COMFORT_TEMP, DEFAULT_COMFORT_TEMP)
             await self._async_command(CMD_PROGRAM, comfort=comfort)
+        elif hvac_mode == HVACMode.HEAT:
+            await self._async_heat(float(self._entry.options.get(CONF_BOOST_TEMP, DEFAULT_BOOST_TEMP)))
         else:
             raise HomeAssistantError(f"Unsupported HVAC mode {hvac_mode}")
 
@@ -110,7 +126,15 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
             return
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is None:
             return
-        await self._async_command(CMD_MANUAL, temp=float(temperature))
+        await self._async_heat(float(temperature))
+
+    async def _async_heat(self, temperature: float) -> None:
+        """Timed mode: heat to `temperature` for the configured hours (0 hours: manual setpoint, no expiry)."""
+        hours = int(self._entry.options.get(CONF_BOOST_HOURS, DEFAULT_BOOST_HOURS))
+        if hours > 0:
+            await self._async_command(CMD_TEMPORARY, temp=temperature, hours=hours)
+        else:
+            await self._async_command(CMD_MANUAL, temp=temperature)
 
     async def _async_command(self, command: int, **params: float) -> None:
         announce, blob = build_command(command, **params)

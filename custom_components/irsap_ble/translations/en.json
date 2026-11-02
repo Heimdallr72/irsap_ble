@@ -36,9 +36,11 @@
     "step": {
       "init": {
         "title": "IRSAP options",
-        "description": "The Comfort temperature is written back to the radiator when you set the mode to Heat (the radiator program resumes). The polling interval is how often Home Assistant connects to read the state.",
+        "description": "The Comfort temperature is written back to the radiator when you set the mode to Auto (the radiator program resumes). Heat is the timed mode: it heats to the timed temperature for the given number of hours, then the program resumes (0 hours = no expiry). The polling interval is how often Home Assistant connects to read the state.",
         "data": {
-          "comfort_temp": "Comfort temperature",
+          "comfort_temp": "Comfort temperature (Auto)",
+          "boost_temp": "Timed mode temperature (Heat)",
+          "boost_hours": "Timed mode duration in hours (0 = no expiry)",
           "scan_interval": "Polling interval (seconds)"
         }
       }

@@ -20,10 +20,14 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_BOOST_HOURS,
+    CONF_BOOST_TEMP,
     CONF_COMFORT_TEMP,
     CONF_DEVICES,
     CONF_LOCAL_NAME,
     CONF_SCAN_INTERVAL,
+    DEFAULT_BOOST_HOURS,
+    DEFAULT_BOOST_TEMP,
     DEFAULT_COMFORT_TEMP,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -161,7 +165,7 @@ class IrsapConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class IrsapOptionsFlow(OptionsFlow):
-    """Options: Comfort preset used by 'heat', polling interval."""
+    """Options: Comfort preset used by 'auto', timed mode ('heat') temperature and duration, polling interval."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
@@ -176,6 +180,20 @@ class IrsapOptionsFlow(OptionsFlow):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
                             min=15, max=30, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX
+                        )
+                    ),
+                    vol.Required(
+                        CONF_BOOST_TEMP, default=options.get(CONF_BOOST_TEMP, DEFAULT_BOOST_TEMP)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=15, max=30, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX
+                        )
+                    ),
+                    vol.Required(
+                        CONF_BOOST_HOURS, default=options.get(CONF_BOOST_HOURS, DEFAULT_BOOST_HOURS)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=24, step=1, unit_of_measurement="h", mode=selector.NumberSelectorMode.BOX
                         )
                     ),
                     vol.Required(

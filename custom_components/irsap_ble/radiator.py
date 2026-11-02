@@ -70,7 +70,9 @@ class IrsapRadiator:
             if device is None:
                 raise IrsapError(
                     f"{self._name} ({self.address}) is not in range of any connectable Bluetooth adapter or proxy "
-                    "(Shelly devices only forward advertisements, they cannot connect)"
+                    ""
+                    "(Shelly devices and other advertisement-only gateways cannot connect: use a local adapter or an "
+                    "ESPHome Bluetooth proxy with bluetooth_proxy: active: true)"
                 )
             client = BleakClientWithServiceCache(device, timeout=CONNECT_TIMEOUT)
             started = time.monotonic()
