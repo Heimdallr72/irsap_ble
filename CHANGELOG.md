@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9
+- README: Bluetooth-only notice, automatic (HACS and My Home Assistant buttons) and manual installation, trademark disclaimer.
+- New original integration icon (the IRSAP NOW app icon was removed).
+
 ## 0.1.8
 - HVAC modes: `off`, `auto` (radiator program, as `heat` was before) and `heat` (timed mode, default 24 C for 2 h).
 - `set_temperature` now starts a timed setpoint for the configured hours (0 hours = manual setpoint with no expiry, as before).

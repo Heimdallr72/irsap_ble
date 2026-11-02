@@ -1,24 +1,40 @@
 # IRSAP BLE Radiator (Home Assistant custom integration)
 
-> Unofficial and experimental. Not affiliated with IRSAP. Reliability depends on the Bluetooth signal between the
-> adapter and the radiator (about -60 dBm or better is recommended).
+Local Bluetooth control for **IRSAP electric towel warmers that have no Wi-Fi** (Ares, advertised as
+`IRSAP_RS_xxxxxxx`). One `climate` entity per radiator, no cloud, no IRSAP NOW account.
 
-Controls IRSAP electric radiators (Ares, advertised as `IRSAP_RS_xxxxxxx`) over Bluetooth, without the IRSAP cloud.
-One `climate` entity per radiator.
+> **Bluetooth only.** This integration supports only the Bluetooth models. Radiators with Wi-Fi that appear in the
+> IRSAP NOW cloud are not supported here; for those, a separate cloud integration exists
+> ([hexCut/irsap-ha](https://github.com/hexCut/irsap-ha)).
+>
+> Unofficial and experimental. Reliability depends on the Bluetooth signal between the adapter and the radiator
+> (about -60 dBm or better is recommended).
 
-## Install
-1. Copy `custom_components/irsap_ble` into `/config/custom_components/` (create the folder if needed).
+## Requirements
+Reading the state and sending commands need a Bluetooth *connection* (the advertisements carry no state data).
+Gateways that only forward advertisements, such as Shelly devices, are **not** enough. Use a local Bluetooth adapter
+or an ESPHome Bluetooth proxy with `bluetooth_proxy: active: true`. Close the IRSAP NOW phone app while Home
+Assistant is connecting: the radiator accepts one connection at a time.
+
+## Installation
+
+### Option 1: automatic (HACS)
+1. Add the repository to HACS and download the integration:
+
+   [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Heimdallr72&repository=irsap_ble&category=integration)
+
 2. Restart Home Assistant.
-3. Settings > Devices & services > Add integration > **IRSAP BLE Radiator**. The integration scans for radiators,
-   lets you tick the ones to add, and asks a name for each (for example the room).
-   Radiators in range are also offered automatically in the "Discovered" section.
+3. Start the setup (the integration scans for radiators in range, lets you tick the ones to add and asks a name for
+   each, for example the room):
 
-**Requirement:** reading the state and sending commands need a Bluetooth *connection* (the advertisements carry no state
-data). Gateways that only forward advertisements, such as Shelly devices, are NOT enough: use a local adapter or an
-ESPHome Bluetooth proxy with `bluetooth_proxy: active: true`.
+   [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=irsap_ble)
 
-The radiators must be reachable by a Bluetooth adapter of Home Assistant (the Raspberry's own, or an ESPHome Bluetooth
-proxy with `bluetooth_proxy: active: true`). Close the IRSAP NOW phone app: the radiator accepts one connection only.
+### Option 2: manual
+1. Download the latest release and copy the folder `custom_components/irsap_ble` into `/config/custom_components/`
+   (create the folder if needed).
+2. Restart Home Assistant.
+3. Go to Settings > Devices & services > Add integration and choose **IRSAP BLE Radiator**. Radiators in range are
+   also offered automatically in the "Discovered" section.
 
 ## Entity
 | Home Assistant | Radiator |
@@ -37,11 +53,12 @@ temperature (24.0 C) and duration (2 h, 0 = no expiry), polling interval
 (default 300 s). The integration connects only for a few seconds per poll or command, so the phone app keeps working
 between two operations.
 
-## Icon
-`custom_components/irsap_ble/brand/icon.png` is shown in the integrations page from Home Assistant 2026.3 on
-(older versions need the icon in the central brands repository and show a placeholder).
-The image is the IRSAP NOW app icon, cropped from a phone screenshot (low resolution, 256 px). It is a third-party
-trademark: fine for private use, replace it before publishing the integration.
+## Icon and trademarks
+The integration icon is an original image made for this project. It is not the IRSAP logo.
+
+IRSAP and IRSAP NOW are trademarks of their respective owners. All product and company names are used for
+identification purposes only, to say which devices the integration works with. Their use does not imply any
+affiliation with, or endorsement by, the trademark owners. This project is independent and unofficial.
 
 ## Known limits
 * Eco / Comfort / antifreeze presets cannot be changed over Bluetooth (the app keeps them locally). Choosing `auto`
