@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10
+- Temperature step is now 1 C (was 0.5 C).
+- New attributes `remaining_minutes` and `remaining` (h:mm) in timed mode (`heat`), refreshed every minute without Bluetooth traffic.
+
 ## 0.1.9
 - README: Bluetooth-only notice, automatic (HACS and My Home Assistant buttons) and manual installation, trademark disclaimer.
 - New original integration icon (the IRSAP NOW app icon was removed).

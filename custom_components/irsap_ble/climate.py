@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -15,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -32,6 +34,7 @@ from .coordinator import IrsapCoordinator
 from .protocol import CMD_MANUAL, CMD_OFF, CMD_PROGRAM, CMD_TEMPORARY, build_command
 from .radiator import IrsapError
 
+TIMER_TICK = timedelta(minutes=1)  # the remaining time is recomputed every minute, without any Bluetooth traffic
 REFRESH_DELAY = 3  # seconds to let the radiator close the connection before reading it back
 
 
@@ -55,7 +58,7 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     )
     _attr_min_temp = MIN_TEMP
     _attr_max_temp = MAX_TEMP
-    _attr_target_temperature_step = 0.5
+    _attr_target_temperature_step = 1.0
 
     def __init__(self, coordinator: IrsapCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
@@ -69,6 +72,23 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
             manufacturer="IRSAP",
             model="Electric radiator (BLE)",
         )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Keep the "remaining time" attributes fresh between two polls
+        self.async_on_remove(async_track_time_interval(self.hass, self._async_tick, TIMER_TICK))
+
+    async def _async_tick(self, _now: datetime) -> None:
+        if self._remaining_minutes() is not None:
+            self.async_write_ha_state()
+
+    def _remaining_minutes(self) -> int | None:
+        """Minutes left in the timed mode (heat); None when no timer is running."""
+        state = self.coordinator.data
+        if state is None or not state.is_on or state.mode != "manual" or state.expiry is None:
+            return None
+        seconds = (state.expiry - datetime.now(state.expiry.tzinfo)).total_seconds()
+        return max(0, int(seconds // 60))
 
     @property
     def available(self) -> bool:
@@ -107,6 +127,10 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
         if state.expiry is not None:
             # program: next program change; manual with a timer: end of the timer
             attrs["until"] = state.expiry.isoformat()
+        if (remaining := self._remaining_minutes()) is not None:
+            # timed mode (heat) only
+            attrs["remaining_minutes"] = remaining
+            attrs["remaining"] = f"{remaining // 60}:{remaining % 60:02d}"
         return attrs
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:

@@ -44,8 +44,9 @@ Assistant is connecting: the radiator accepts one connection at a time.
 | `hvac_mode` `off` | off, antifreeze 5 C |
 | `set_temperature` | timed setpoint for the configured hours (0 hours: manual setpoint with no expiry) |
 | `current_temperature` | measured temperature |
-| `target_temperature` | effective setpoint |
+| `target_temperature` | effective setpoint (the temperature step is 1 C) |
 | attribute `control_mode` | `manual` or `program` |
+| attribute `remaining_minutes`, `remaining` | timed mode (`heat`) only: time left until the program resumes, in minutes and as `h:mm` (updated every minute) |
 | attribute `until` | program: next program change; manual with timer: end of the timer |
 
 Options (per radiator): Comfort temperature written back when you choose `auto` (default 24.0 C), timed mode
