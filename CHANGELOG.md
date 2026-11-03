@@ -2,7 +2,7 @@
 
 ## 0.1.10
 - Temperature step is now 1 C (was 0.5 C).
-- Fix: the timed mode (`heat`) was shown as `auto` because the radiator keeps reporting "program" during a temporary setpoint. It is now recognised from the end time and the setpoint, so the HVAC mode and the remaining time are correct.
+- Fix: the timed mode (`heat`) was shown as `auto` because the radiator keeps reporting "program" during a temporary setpoint. It is now recognised from the end time of the temporary setpoint (record 07), so the HVAC mode and the remaining time are correct.
 - New attributes `remaining_minutes` and `remaining` (h:mm) in timed mode (`heat`), refreshed every minute without Bluetooth traffic.
 
 ## 0.1.9

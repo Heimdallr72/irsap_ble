@@ -30,6 +30,11 @@ MANUAL = (
 ).replace(" ", "")
 
 
+# Full state areas read from a real radiator (Ares): temporary 24.0 C for 2 h, and plain program
+TIMED_24_2H = "00210110020121011001022101203203210220b40004210220c80005210220f00006210220f000072104106059ea6a08210220c80009218c40010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff0a210220fb000b210220f0000c2104106059ea6a0d210110000e210110ff0f210210ffff10210210ffff11210110001221012002132101200014210120001521011000162101100017210110011821011000192102100807003101101c013101105702310410057ee96a0331021090010431011000053101104606310110000731011000083101100009310110000a310220ff7f0041011000014101100002410440000000000341044000000000044101100005410040064104400000000007410410ffffffff08410110000941011000613670a4"
+PROGRAM_PLAIN = "00210110020121011001022101203203210220b40004210220c80005210220f00006210220f000072101100008210220c80009218c40010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff0a210220fb000b210220f0000c210410504bea6a0d210110000e210110ff0f210210ffff10210210ffff11210110001221012002132101200014210120001521011000162101100017210110011821011000192102100807003101101c013101105702310410057ee96a0331021090010431011000053101104606310110000731011000083101100009310110000a310220ff7f0041011000014101100002410440000000000341044000000000044101100005410040064104400000000007410410ffffffff084101100009410110004f56a8a8"
+
+
 class TestProtocol(unittest.TestCase):
     def test_crc_and_lengths(self):
         for cmd in (1, 2, 3, 4):
@@ -83,16 +88,16 @@ class TestProtocol(unittest.TestCase):
         st = protocol.parse_state(b"\0" * 10 + bytes.fromhex(MANUAL))
         self.assertEqual((st.mode, st.is_on, st.target_temp, st.expiry), ("manual", True, 22.0, None))
 
-    def test_is_timed(self):
+    def test_timed_mode_real_captures(self):
         from datetime import timedelta
-        st = protocol.parse_state(b"\0" * 10 + bytes.fromhex(PROGRAM_ON))   # temporary 22.5 C (not a preset)
-        before = st.expiry - timedelta(hours=1)
-        after = st.expiry + timedelta(hours=1)
-        self.assertTrue(protocol.is_timed(st, None, before))
-        self.assertFalse(protocol.is_timed(st, None, after))                  # the timer has ended
-        st_preset = protocol.RadiatorState("program", True, 24.0, 24.0, st.expiry, st.presets)
-        self.assertFalse(protocol.is_timed(st_preset, None, before))          # plain program, next change
-        self.assertTrue(protocol.is_timed(st_preset, st.expiry, before))      # timed command with the same setpoint
+        t = protocol.parse_state(b"\0" * 10 + bytes.fromhex(TIMED_24_2H))      # temporary 24.0 C, equal to Comfort
+        p = protocol.parse_state(b"\0" * 10 + bytes.fromhex(PROGRAM_PLAIN))    # plain program, same setpoint
+        self.assertEqual((t.mode, t.target_temp, p.mode, p.target_temp), ("program", 24.0, "program", 24.0))
+        self.assertIsNotNone(t.timed_until)
+        self.assertIsNone(p.timed_until)
+        self.assertTrue(protocol.is_timed(t, t.timed_until - timedelta(hours=1)))
+        self.assertFalse(protocol.is_timed(t, t.timed_until + timedelta(minutes=1)))   # the timer has ended
+        self.assertFalse(protocol.is_timed(p, p.expiry - timedelta(hours=1)))
         self.assertTrue(protocol.is_timed(protocol.parse_state(b"\0" * 10 + bytes.fromhex(MANUAL))))
         self.assertFalse(protocol.is_timed(protocol.parse_state(b"\0" * 10 + bytes.fromhex(OFF))))
 

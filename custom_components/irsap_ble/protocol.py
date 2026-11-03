@@ -42,6 +42,7 @@ class RadiatorState:
     target_temp: float | None   # effective setpoint, C
     expiry: datetime | None     # program: next program change; manual with timer: end of the timer
     presets: dict[str, float | None]
+    timed_until: datetime | None = None  # end of a running temporary setpoint (record 07), None otherwise
 
 
 def _set_record(blob: bytearray, record_id: int, tenths: int) -> None:
@@ -125,6 +126,7 @@ def parse_state(raw: bytes) -> RadiatorState | None:
         mode = {1: MODE_MANUAL, 2: MODE_PROGRAM}.get(raw[start - 1])
     on = rec(0x01)
     measured, setpoint, expiry = rec(0x0A), rec(0x0B), rec(0x0C)
+    timed = rec(0x07)
     if on is None or setpoint is None:
         return None
 
@@ -137,27 +139,20 @@ def parse_state(raw: bytes) -> RadiatorState | None:
         current_temp=tenth(measured),
         target_temp=tenth(setpoint),
         expiry=None if expiry in (None, 0, 0xFFFFFFFF) else datetime.fromtimestamp(expiry, tz=UTC),
+        timed_until=None if timed in (None, 0, 0xFFFFFFFF) else datetime.fromtimestamp(timed, tz=UTC),
         presets={"antifreeze": tenth(rec(0x02)), "eco": tenth(rec(0x03)), "comfort": tenth(rec(0x05))},
     )
 
 
-def is_timed(state: RadiatorState, timed_expiry: datetime | None = None, now: datetime | None = None) -> bool:
+def is_timed(state: RadiatorState, now: datetime | None = None) -> bool:
     """True when the radiator is in the timed mode (HVAC mode "heat").
 
-    The radiator keeps reporting "program" while a temporary setpoint runs, so the timed mode is recognised as:
-    manual mode, or program mode with an end time in the future and either the end time of the timed command we
-    sent (timed_expiry) or an effective setpoint that is not one of the presets.
+    The radiator keeps reporting "program" while a temporary setpoint runs. The temporary setpoint is recognised by
+    its end time (record 07, empty when no temporary setpoint is running). Manual mode counts as timed mode too.
     """
     if not state.is_on:
         return False
     if state.mode == MODE_MANUAL:
         return True
     now = now or datetime.now(UTC)
-    if state.mode != MODE_PROGRAM or state.expiry is None or state.expiry <= now:
-        return False
-    if timed_expiry is not None and state.expiry == timed_expiry:
-        return True
-    if state.target_temp is None:
-        return False
-    presets = [v for v in state.presets.values() if v is not None]
-    return all(abs(state.target_temp - v) > 0.05 for v in presets)
+    return state.timed_until is not None and state.timed_until > now
