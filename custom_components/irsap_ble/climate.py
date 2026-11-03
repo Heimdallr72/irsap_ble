@@ -31,7 +31,7 @@ from .const import (
     MIN_TEMP,
 )
 from .coordinator import IrsapCoordinator
-from .protocol import CMD_MANUAL, CMD_OFF, CMD_PROGRAM, CMD_TEMPORARY, build_command
+from .protocol import CMD_MANUAL, CMD_OFF, CMD_PROGRAM, CMD_TEMPORARY, build_command, is_timed
 from .radiator import IrsapError
 
 TIMER_TICK = timedelta(minutes=1)  # the remaining time is recomputed every minute, without any Bluetooth traffic
@@ -63,6 +63,7 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     def __init__(self, coordinator: IrsapCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._entry = entry
+        self._timed_expiry: datetime | None = None  # end time of the last timed command sent from Home Assistant
         address = coordinator.radiator.address
         self._attr_unique_id = address
         self._attr_device_info = DeviceInfo(
@@ -85,7 +86,7 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     def _remaining_minutes(self) -> int | None:
         """Minutes left in the timed mode (heat); None when no timer is running."""
         state = self.coordinator.data
-        if state is None or not state.is_on or state.mode != "manual" or state.expiry is None:
+        if state is None or state.expiry is None or not is_timed(state, self._timed_expiry):
             return None
         seconds = (state.expiry - datetime.now(state.expiry.tzinfo)).total_seconds()
         return max(0, int(seconds // 60))
@@ -102,7 +103,7 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
         state = self.coordinator.data
         if not state.is_on:
             return HVACMode.OFF
-        return HVACMode.AUTO if state.mode == "program" else HVACMode.HEAT
+        return HVACMode.HEAT if is_timed(state, self._timed_expiry) else HVACMode.AUTO
 
     @property
     def current_temperature(self) -> float | None:
@@ -157,6 +158,13 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
         hours = int(self._entry.options.get(CONF_BOOST_HOURS, DEFAULT_BOOST_HOURS))
         if hours > 0:
             await self._async_command(CMD_TEMPORARY, temp=temperature, hours=hours)
+            state = self.coordinator.data
+            # Remember the end time reported by the radiator, to recognise the timed mode even when the
+            # timed setpoint equals one of the presets
+            if state is not None and state.mode == "program" and state.expiry is not None and (
+                state.target_temp is not None and abs(state.target_temp - temperature) < 0.05
+            ):
+                self._timed_expiry = state.expiry
         else:
             await self._async_command(CMD_MANUAL, temp=temperature)
 

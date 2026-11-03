@@ -83,6 +83,19 @@ class TestProtocol(unittest.TestCase):
         st = protocol.parse_state(b"\0" * 10 + bytes.fromhex(MANUAL))
         self.assertEqual((st.mode, st.is_on, st.target_temp, st.expiry), ("manual", True, 22.0, None))
 
+    def test_is_timed(self):
+        from datetime import timedelta
+        st = protocol.parse_state(b"\0" * 10 + bytes.fromhex(PROGRAM_ON))   # temporary 22.5 C (not a preset)
+        before = st.expiry - timedelta(hours=1)
+        after = st.expiry + timedelta(hours=1)
+        self.assertTrue(protocol.is_timed(st, None, before))
+        self.assertFalse(protocol.is_timed(st, None, after))                  # the timer has ended
+        st_preset = protocol.RadiatorState("program", True, 24.0, 24.0, st.expiry, st.presets)
+        self.assertFalse(protocol.is_timed(st_preset, None, before))          # plain program, next change
+        self.assertTrue(protocol.is_timed(st_preset, st.expiry, before))      # timed command with the same setpoint
+        self.assertTrue(protocol.is_timed(protocol.parse_state(b"\0" * 10 + bytes.fromhex(MANUAL))))
+        self.assertFalse(protocol.is_timed(protocol.parse_state(b"\0" * 10 + bytes.fromhex(OFF))))
+
     def test_parse_garbage(self):
         self.assertIsNone(protocol.parse_state(b"\x01\x02\x03"))
 
