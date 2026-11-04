@@ -50,6 +50,7 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
 
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_translation_key = "radiator"  # state names (e.g. "Heat") come from translations/*.json
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     # AUTO = the radiator program, HEAT = timed mode (setpoint and hours from the options)
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.HEAT]

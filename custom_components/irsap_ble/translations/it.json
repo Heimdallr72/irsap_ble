@@ -45,5 +45,14 @@
         }
       }
     }
+  },
+  "entity": {
+    "climate": {
+      "radiator": {
+        "state": {
+          "heat": "Heat"
+        }
+      }
+    }
   }
 }
