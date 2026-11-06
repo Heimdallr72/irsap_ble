@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.11
+
+- Fix: every command (Auto, Heat, Off, temperature) carries the whole configuration table of the radiator, which includes the weekly program. The table used to hold the program captured at development time, so a command could overwrite the program set in the IRSAP NOW app. Commands now send back the weekly program read from the radiator at the last poll.
+- The weekly program is still edited only in the IRSAP NOW app (Comfort preset temperature excluded, see README).
+
 ## 0.1.10
 
 - Mode `heat` is labelled "Heat" (entity translations).

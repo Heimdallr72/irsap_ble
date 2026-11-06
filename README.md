@@ -64,6 +64,7 @@ affiliation with, or endorsement by, the trademark owners. This project is indep
 ## Known limits
 * Eco / Comfort / antifreeze presets cannot be changed over Bluetooth (the app keeps them locally). Choosing `auto`
   writes back the Comfort value set in the options.
+* The weekly program is edited only in the IRSAP NOW app. Every command sends back the program the radiator had at the last poll, so it is not changed (from 0.1.11; older versions could overwrite it).
 * Setting a temperature (or choosing `heat`) starts the timed mode; with 0 hours it switches to manual mode until the next change. Use `auto` to return to the program.
 * Temperature range 5-30 C is a safe guess, the real limits were not verified.
 * Tested on the protocol level only (captures from one model, firmware 01.0.55). Writes use the full configuration

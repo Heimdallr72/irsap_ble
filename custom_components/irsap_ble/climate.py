@@ -165,7 +165,11 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
             await self._async_command(CMD_MANUAL, temp=temperature)
 
     async def _async_command(self, command: int, **params: float) -> None:
-        announce, blob = build_command(command, **params)
+        state = self.coordinator.data
+        if state is None or state.program is None:
+            raise HomeAssistantError("The weekly program of the radiator has not been read yet, try again in a minute")
+        # Every command carries the whole configuration table: send back the program the radiator has now
+        announce, blob = build_command(command, program=state.program, **params)
         try:
             await self.coordinator.radiator.async_send(announce, blob)
         except IrsapError as err:

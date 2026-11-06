@@ -105,5 +105,53 @@ class TestProtocol(unittest.TestCase):
         self.assertIsNone(protocol.parse_state(b"\x01\x02\x03"))
 
 
+# Real state area (Ares) after the app removed the Monday-Friday 06:00-09:00 Comfort slot: the program record is
+# shorter (0x6e bytes instead of 0x8c). Days are Sunday, Monday..Friday, Saturday.
+PROGRAM_EDITED = "00210110020121011000022101203203210220b40004210220c80005210220f00006210220f000072101100008210220c80009216e40010600020900010c00020e0001120002160001ff010c00020e0001120002160001ff010c00020e0001120002160001ff010c00020e0001120002160001ff010c00020e0001120002160001ff010c00020e0001120002160001ff010600020900010c00020e0001120002160001ff0a210220e9000b210120320c210410ffffffff0d210110000e210110ff0f210210ffff10210210ffff1121011000122101200213210120001421012000152101100016210110001721011001182101100019210210080700310110a2013101100002310410a674ed6a0331021090010431011000053101104906310110000731011000083101100009310110000a310220ff7f0041011000014101100002410440000000000341044000000000044101100005410040064104400000000007410410ffffffff08410110000941011000a9027d0c"
+
+
+class TestProgram(unittest.TestCase):
+    def test_program_is_read_from_the_state(self):
+        program = protocol.parse_state(bytes.fromhex(PROGRAM_EDITED)).program
+        self.assertEqual(len(program), 0x6E)
+        days = program.split(b"\xff")[:-1]
+        self.assertEqual(len(days), 7)
+        self.assertEqual(len(days[0]), 19)   # Sunday: 06:00 Comfort kept
+        self.assertEqual(len(days[3]), 13)   # Wednesday: no 06:00 Comfort
+        self.assertEqual(days[0], days[6])    # Saturday like Sunday
+
+    def test_state_without_program_record(self):
+        self.assertIsNone(protocol.find_program(bytes.fromhex(OFF[:60])))
+
+    def test_template_program_is_a_no_op(self):
+        template_program = protocol.find_program(bytes.fromhex(protocol.TEMPLATES[2]))
+        self.assertEqual(len(template_program), 0x8C)
+        for cmd in (1, 2, 3, 4):
+            a = protocol.build_command(cmd, temp=22.0, hours=2, now=1_800_000_000) if cmd in (3, 4) else \
+                protocol.build_command(cmd, now=1_800_000_000)
+            b = protocol.build_command(cmd, temp=22.0, hours=2, program=template_program, now=1_800_000_000) \
+                if cmd in (3, 4) else protocol.build_command(cmd, program=template_program, now=1_800_000_000)
+            self.assertEqual(a, b)
+
+    def test_command_carries_the_current_program(self):
+        program = protocol.parse_state(bytes.fromhex(PROGRAM_EDITED)).program
+        for cmd in (1, 2, 3, 4):
+            kwargs = {"temp": 22.0, "hours": 2} if cmd == 3 else {"temp": 22.0} if cmd == 4 else {}
+            announce, blob = protocol.build_command(cmd, program=program, now=1_800_000_000, **kwargs)
+            template = bytes.fromhex(protocol.TEMPLATES[cmd])
+            self.assertEqual(len(blob), len(template) - 30)
+            self.assertEqual(protocol.find_program(blob), program)
+            self.assertEqual(int.from_bytes(announce[4:6], "little"), len(blob))
+            self.assertEqual(int.from_bytes(blob[41:43], "little"), len(blob) - 47)
+            self.assertEqual(int.from_bytes(blob[-4:], "little"), zlib.crc32(blob[:-4]) & 0xFFFFFFFF)
+            if cmd in (3, 4):   # these also change the temperature/expiry records, checked elsewhere
+                continue
+            # everything outside the program record is unchanged
+            k = blob.find(bytes([9, 0x21, 0x6E, 0x40]))
+            mask = lambda b: b[:52] + bytes(4) + b[56:]   # the second timestamp (52:56) is refreshed at each build
+            self.assertEqual(mask(blob[:k])[43:], mask(template[:k])[43:])
+            self.assertEqual(blob[k + 4 + 0x6E : -4], template[k + 4 + 0x8C : -4])
+
+
 if __name__ == "__main__":
     unittest.main()

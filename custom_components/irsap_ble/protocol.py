@@ -43,6 +43,7 @@ class RadiatorState:
     expiry: datetime | None     # program: next program change; manual with timer: end of the timer
     presets: dict[str, float | None]
     timed_until: datetime | None = None  # end of a running temporary setpoint (record 07), None otherwise
+    program: bytes | None = None         # weekly program (record 09): one entry per day, as stored by the radiator
 
 
 def _set_record(blob: bytearray, record_id: int, tenths: int) -> None:
@@ -53,12 +54,40 @@ def _set_record(blob: bytearray, record_id: int, tenths: int) -> None:
     blob[k + 4 : k + 6] = struct.pack("<H", tenths)
 
 
+PROGRAM_RECORD = 0x09  # weekly program: 7 day entries (Sunday, Monday..Friday, Saturday), each ends with 0xff
+# Offset of the 2-byte payload length in a command blob: it counts every byte after it except the final CRC
+PAYLOAD_LENGTH_OFFSET = 41
+
+
+def find_program(data: bytes) -> bytes | None:
+    """Return the value of the weekly program record found in a state or command table, None if absent/invalid."""
+    k = data.find(bytes([PROGRAM_RECORD, 0x21]))
+    while k >= 0:
+        if k + 4 <= len(data) and data[k + 3] == 0x40:
+            length = data[k + 2]
+            program = bytes(data[k + 4 : k + 4 + length])
+            if len(program) == length and program.count(0xFF) == 7 and program.endswith(b"\xff"):
+                return program
+        k = data.find(bytes([PROGRAM_RECORD, 0x21]), k + 1)
+    return None
+
+
+def _set_program(blob: bytearray, program: bytes) -> None:
+    """Replace the weekly program in a command table and fix the length fields that depend on it."""
+    k = blob.find(bytes([PROGRAM_RECORD, 0x21, 0x8C, 0x40]))
+    if k < 0:
+        raise ValueError("program record not found in template")
+    blob[k + 2 : k + 4 + 0x8C] = bytes([len(program), 0x40]) + program
+    struct.pack_into("<H", blob, PAYLOAD_LENGTH_OFFSET, len(blob) - PAYLOAD_LENGTH_OFFSET - 6)
+
+
 def build_command(
     command: int,
     *,
     temp: float | None = None,
     hours: float | None = None,
     comfort: float | None = None,
+    program: bytes | None = None,
     now: int | None = None,
 ) -> tuple[bytes, bytes]:
     """Return (announce, blob) to write on UUID_ANNOUNCE then UUID_CONFIG.
@@ -66,9 +95,13 @@ def build_command(
     command 3: temp (C) and hours (rounded to the full hour) are used.
     command 4: temp (C) is the manual setpoint.
     command 2: comfort (C) is the Comfort preset written back (the template value is 24.0).
+    program: the weekly program currently stored in the radiator. Every command carries the whole configuration
+    table, so without it the program captured in the template would overwrite the one set in the app.
     """
     now = int(now or time.time())
     blob = bytearray(bytes.fromhex(TEMPLATES[command]))
+    if program is not None:
+        _set_program(blob, program)
     if command == CMD_TEMPORARY:
         if temp is not None:
             _set_record(blob, 0x06, round(temp * 10))
@@ -141,6 +174,7 @@ def parse_state(raw: bytes) -> RadiatorState | None:
         expiry=None if expiry in (None, 0, 0xFFFFFFFF) else datetime.fromtimestamp(expiry, tz=UTC),
         timed_until=None if timed in (None, 0, 0xFFFFFFFF) else datetime.fromtimestamp(timed, tz=UTC),
         presets={"antifreeze": tenth(rec(0x02)), "eco": tenth(rec(0x03)), "comfort": tenth(rec(0x05))},
+        program=find_program(raw),
     )
 
 
