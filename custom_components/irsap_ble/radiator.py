@@ -33,6 +33,10 @@ CONNECT_ATTEMPTS = 4    # attempts per operation
 RETRY_PAUSE = 5         # seconds between attempts: lets BlueZ and the radiator (which re-advertises slowly) recover
 
 
+# Everything the integration reads or writes: all of it must be present, or the service discovery was partial
+REQUIRED_CHARACTERISTICS = (UUID_ANNOUNCE, UUID_CONFIG, UUID_STATUS_HEADER, UUID_STATUS_DATA)
+
+
 class IrsapError(Exception):
     """Communication with the radiator failed."""
 
@@ -89,10 +93,11 @@ class IrsapRadiator:
                 await asyncio.sleep(RETRY_PAUSE)
                 continue
             _LOGGER.debug("Connected to %s in %.1f s", self._name, time.monotonic() - started)
-            if client.services.get_characteristic(UUID_ANNOUNCE) is None:
+            missing = [uuid for uuid in REQUIRED_CHARACTERISTICS if client.services.get_characteristic(uuid) is None]
+            if missing:
                 # Incomplete service discovery (stale BlueZ cache or slow radiator): drop the cache and retry
-                last_error = IrsapError("GATT services incomplete after connect")
-                _LOGGER.debug("Services of %s incomplete, clearing the cache and retrying", self._name)
+                last_error = IrsapError(f"GATT services incomplete after connect (missing {', '.join(missing)})")
+                _LOGGER.debug("Services of %s incomplete (missing %s), clearing the cache and retrying", self._name, missing)
                 try:
                     await client.clear_cache()
                 except (BleakError, AttributeError, NotImplementedError) as err:
