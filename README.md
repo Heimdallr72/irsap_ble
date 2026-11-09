@@ -69,3 +69,7 @@ affiliation with, or endorsement by, the trademark owners. This project is indep
 * Temperature range 5-30 C is a safe guess, the real limits were not verified.
 * Tested on the protocol level only (captures from one model, firmware 01.0.55). Writes use the full configuration
   table captured from the app: if your firmware differs, check before using it on other models.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

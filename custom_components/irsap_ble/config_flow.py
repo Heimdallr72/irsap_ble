@@ -38,7 +38,7 @@ SOURCE_BATCH = "batch"  # internal source used to create the entries of the othe
 
 
 def _default_name(local_name: str) -> str:
-    """'IRSAP_RS_HHATQYN' -> 'IRSAP HHATQYN'."""
+    """'IRSAP_RS_XXXXXXX' -> 'IRSAP XXXXXXX'."""
     return f"IRSAP {local_name.removeprefix(NAME_PREFIX)}"
 
 
