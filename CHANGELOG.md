@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.13
+
+- Climate entity: use the `native_*` temperature properties (`_attr_native_temperature_unit`, `native_current_temperature`, `native_target_temperature`). The old ones are deprecated in Home Assistant and stop working in 2027.11.
+- A failed command (Auto, Heat, Off, temperature) is now written to the log as a warning with the command name, the entity and the error. The error shown in the UI was not logged before.
+- Connections now go through `bleak_retry_connector.establish_connection()`, as Home Assistant recommends. This removes the "BleakClient.connect() called without bleak-retry-connector" warning logged on every connection. The library is already provided by Home Assistant's Bluetooth integration.
+- A command that fails because of a connection error is sent again up to 3 times (5 s pause) before the error is raised to the Climate entity. Each failed attempt is logged as a warning.
+- After a failed read or write the cached GATT services are dropped, so a stale handle (GATT error 133 on the write, seen on Bath 0) cannot repeat on the next attempt.
+- README: HACS references renamed to Marketplace (the My Home Assistant button still works).
+
 ## 0.1.12
 
 - After connecting, all four GATT characteristics the integration uses are checked (not only the first one). A partial service discovery, which showed up as "Characteristic ... not found" after a restart, now clears the cache and retries instead of failing the poll.
@@ -17,7 +26,7 @@
 - New attributes `remaining_minutes` and `remaining` (h:mm) in timed mode (`heat`), refreshed every minute without Bluetooth traffic.
 
 ## 0.1.9
-- README: Bluetooth-only notice, automatic (HACS and My Home Assistant buttons) and manual installation, trademark disclaimer.
+- README: Bluetooth-only notice, automatic (Marketplace and My Home Assistant buttons) and manual installation, trademark disclaimer.
 - New original integration icon (the IRSAP NOW app icon was removed).
 
 ## 0.1.8

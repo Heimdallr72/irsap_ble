@@ -18,10 +18,10 @@ Assistant is connecting: the radiator accepts one connection at a time.
 
 ## Installation
 
-### Option 1: automatic (HACS)
-1. Add the repository to HACS and download the integration:
+### Option 1: automatic (Marketplace)
+1. Add the repository to the Marketplace and download the integration:
 
-   [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Heimdallr72&repository=irsap_ble&category=integration)
+   [![Open your Home Assistant instance and open a repository inside the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Heimdallr72&repository=irsap_ble&category=integration)
 
 2. Restart Home Assistant.
 3. Start the setup (the integration scans for radiators in range, lets you tick the ones to add and asks a name for

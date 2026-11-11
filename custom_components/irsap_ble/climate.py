@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -34,7 +35,13 @@ from .coordinator import IrsapCoordinator
 from .protocol import CMD_MANUAL, CMD_OFF, CMD_PROGRAM, CMD_TEMPORARY, build_command, is_timed
 from .radiator import IrsapError
 
+_LOGGER = logging.getLogger(__name__)
+
+COMMAND_NAMES = {CMD_OFF: "off", CMD_PROGRAM: "program", CMD_TEMPORARY: "temporary", CMD_MANUAL: "manual"}
+
 TIMER_TICK = timedelta(minutes=1)  # the remaining time is recomputed every minute, without any Bluetooth traffic
+COMMAND_ATTEMPTS = 3  # a command is sent again after a connection failure (radiator at the edge of the proxy range)
+COMMAND_RETRY_PAUSE = 5  # seconds between two attempts
 REFRESH_DELAY = 3  # seconds to let the radiator close the connection before reading it back
 
 
@@ -51,7 +58,7 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_translation_key = "radiator"  # state names (e.g. "Heat") come from translations/*.json
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     # AUTO = the radiator program, HEAT = timed mode (setpoint and hours from the options)
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.HEAT]
     _attr_supported_features = (
@@ -109,11 +116,11 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
         return HVACMode.HEAT if is_timed(state) else HVACMode.AUTO
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         return None if self.coordinator.data is None else self.coordinator.data.current_temp
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         return None if self.coordinator.data is None else self.coordinator.data.target_temp
 
     @property
@@ -166,13 +173,25 @@ class IrsapClimate(CoordinatorEntity[IrsapCoordinator], ClimateEntity):
 
     async def _async_command(self, command: int, **params: float) -> None:
         state = self.coordinator.data
+        name = COMMAND_NAMES.get(command, str(command))
         if state is None or state.program is None:
+            _LOGGER.warning("Command %s for %s refused: the weekly program has not been read yet", name, self.entity_id)
             raise HomeAssistantError("The weekly program of the radiator has not been read yet, try again in a minute")
         # Every command carries the whole configuration table: send back the program the radiator has now
         announce, blob = build_command(command, program=state.program, **params)
-        try:
-            await self.coordinator.radiator.async_send(announce, blob)
-        except IrsapError as err:
-            raise HomeAssistantError(str(err)) from err
+        for attempt in range(1, COMMAND_ATTEMPTS + 1):
+            try:
+                await self.coordinator.radiator.async_send(announce, blob)
+                break
+            except IrsapError as err:
+                # The error shown in the UI is not written to the log, so keep a trace here
+                _LOGGER.warning(
+                    "Command %s for %s failed (attempt %d of %d): %s", name, self.entity_id, attempt, COMMAND_ATTEMPTS, err
+                )
+                if attempt == COMMAND_ATTEMPTS:
+                    # Still raised to the Climate entity, so scripts and automations can detect the failure
+                    raise HomeAssistantError(str(err)) from err
+                await asyncio.sleep(COMMAND_RETRY_PAUSE)
+        _LOGGER.debug("Command %s sent to %s", name, self.entity_id)
         await asyncio.sleep(REFRESH_DELAY)
         await self.coordinator.async_refresh()
